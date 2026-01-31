@@ -1,0 +1,157 @@
+# users/serializers.py
+import logging
+import random
+from datetime import timedelta
+from datetime import datetime
+from django.contrib.auth.hashers import make_password
+from django.contrib.auth.password_validation import validate_password
+
+from django.core.validators import RegexValidator
+from django.db import transaction, IntegrityError
+from django.utils import timezone
+from rest_framework import serializers
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from .models import User
+
+
+from axes.models import AccessAttempt
+from rest_framework.exceptions import AuthenticationFailed
+from django.contrib.auth import authenticate
+
+from .models import Menu, Order, OrderItem
+FAILURE_LIMIT = 5
+COOLOFF_TIME = timedelta(minutes=1)
+# logging.getLogger("django.utils.autoreload").setLevel(logging.WARNING)
+# logger = logging.getLogger('custom_logger')
+# OTP Constants
+OTP_LENGTH = 6
+OTP_EXPIRY_TIME = 600  # 10 minutes
+
+
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+
+class TokenSerializer(serializers.Serializer):
+    """Serializer for generating JWT tokens"""
+    @staticmethod
+    def get_token(user):
+        refresh = RefreshToken.for_user(user)
+        return{
+            'refresh': str(refresh),
+            'access': str(refresh.token)
+        }
+
+
+
+
+
+class RegisterUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['name', 'phone_number', 'email']
+
+
+
+class SignInSerializer(serializers.Serializer):
+    phone_number = serializers.CharField()
+
+    def validate(self, data):
+        phone_number = data.get("phone_number")
+
+        # Step 1: Check if user exists
+        try:
+            user = User.objects.get(phone_number=phone_number)
+        except User.DoesNotExist:
+            raise AuthenticationFailed("User not found. Please register.")
+
+        # Step 2: Check active status
+        if not user.is_active:
+            raise AuthenticationFailed("Account is disabled")
+
+        # Step 3: Generate JWT tokens
+        refresh = RefreshToken.for_user(user)
+
+        # Step 4: Return user data + tokens
+        return {
+            "user_id": user.id,
+            "name": user.name,
+            "phone_number": user.phone_number,
+            "email": user.email,
+            "access_token": str(refresh.access_token),
+            "refresh_token": str(refresh),
+        }
+    
+
+class MenuSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Menu
+        fields = ['id', 'name', 'description', 'price', 'is_vegetarian', 'rating', 'addition', 'image']
+
+
+class OrderItemSerializer(serializers.ModelSerializer):
+    menu_name = serializers.CharField(source="menu.name", read_only=True)
+    price = serializers.DecimalField(max_digits=8, decimal_places=2, read_only=True)
+
+    class Meta:
+        model = OrderItem
+        fields = ['menu', 'menu_name', 'quantity', 'price']
+
+
+class OrderSerializer(serializers.ModelSerializer):
+    items = OrderItemSerializer(source="orderitem_set", many=True)
+    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
+
+    class Meta:
+        model = Order
+        fields = [
+            "id",
+            "user",
+            "items",
+            "total_price",
+            "status",
+            "payment_status",
+            "created_at"
+        ]
+        read_only_fields = ["id", "total_price", "status", "created_at"]
+
+    def create(self, validated_data):
+        items_data = validated_data.pop("orderitem_set", [])
+
+        # Create empty order first
+        order = Order.objects.create(total_price=0, **validated_data)
+
+        total = 0
+
+        for item in items_data:
+            menu = item["menu"]
+            quantity = item.get("quantity", 1)
+
+            price = menu.price  # ✅ price comes from DB only
+
+            OrderItem.objects.create(
+                order=order,
+                menu=menu,
+                quantity=quantity,
+                price=price
+            )
+
+            total += price * quantity
+
+        order.total_price = total
+        order.save()
+
+        return order
+    
+class OrderStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = ["status", "payment_status"]
+
+from .models import Payment
+
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = "__all__"
