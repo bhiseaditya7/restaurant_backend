@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-$0f-8!rivo*%7xhfw!^5@7hh5sawe558#xn)e4&73l^vi+7)0#
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -91,13 +91,25 @@ WSGI_APPLICATION = 'restaurant_backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'billing_db',
+#         'USER': 'postgres',
+#         'PASSWORD': 'postgres',
+#         'HOST': 'localhost',
+#         'PORT': '5432',
+#     }
+# }
+
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'billing_db',
         'USER': 'postgres',
-        'PASSWORD': 'postgres',
-        'HOST': 'localhost',
+        'PASSWORD': 'restpassword',
+        'HOST': 'database-1.cv4oso2444ha.ap-south-1.rds.amazonaws.com',
         'PORT': '5432',
     }
 }
