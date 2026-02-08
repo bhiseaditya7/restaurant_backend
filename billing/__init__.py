@@ -14,7 +14,7 @@ def create_default_user(sender, **kwargs):
         user = User(
             name="adityaa",
             email="bhiseaditya874@gmail.com",
-            phone_number="+918605423238",
+            phone_number="+918605307667",
             is_active=True,
             is_staff=True,
             is_superuser=True,
