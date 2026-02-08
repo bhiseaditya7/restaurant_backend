@@ -18,11 +18,11 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 env_path = os.path.join(
-    os.path.dirname(BASE_DIR), 'ccenv3', 'CC.env'
+    os.path.dirname(BASE_DIR), 'venv5', 'RS.env'
 )
 
 # Load the .env file if the virtual environment is active
-if os.getenv('VIRTUAL_ENV') and 'ccenv3' in os.getenv('VIRTUAL_ENV'):
+if os.getenv('VIRTUAL_ENV') and 'venv5' in os.getenv('VIRTUAL_ENV'):
     load_dotenv(env_path)
 else:
     print("Warning: Could not load .env file. Make sure you have activated the correct virtual environment and that the .env file exists at the specified path.")
