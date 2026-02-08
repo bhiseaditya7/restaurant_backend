@@ -3,7 +3,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
   
-    MenuViewSet, OrderViewSet, SignInView, UserLogoutViewSet,   UserRegistration2, CreatePaymentView, VerifyPaymentView , RazorpayCreatePayment, VerifyRazorpayPayment
+    AdminLoginView, MenuViewSet, OrderViewSet, SignInView, UserLogoutViewSet,   UserRegistration2, CreatePaymentView, VerifyPaymentView , RazorpayCreatePayment, VerifyRazorpayPayment
 )
 
 app_name = 'billing'
@@ -25,4 +25,5 @@ urlpatterns = [
     path("payments/verify/", VerifyPaymentView.as_view()),
     path("payments/razorpay/create/", RazorpayCreatePayment.as_view()),
     path("payments/razorpay/verify/", VerifyRazorpayPayment.as_view()),
+    path("auth/admin/login/", AdminLoginView.as_view()),
 ]

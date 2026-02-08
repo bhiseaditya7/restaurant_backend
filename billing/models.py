@@ -76,13 +76,14 @@ class Order(models.Model):
 
     ORDER_TYPE_CHOICES = [
         ('Pending', 'Pending'),
+        ('Ongoing', 'Ongoing'),
         ('Preparing', 'Preparing'),
         ('Completed', 'Completed'),
         ('Cancelled', 'Cancelled'),
     ]
 
     PAYMENT_STATUS=[
-        ('InBucket', 'InBucket'),
+        # ('InBucket', 'InBucket'),
         ('Paid', 'Paid'),
         ('Unpaid', 'Unpaid'),
     ]
@@ -91,7 +92,7 @@ class Order(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     items = models.ManyToManyField(Menu, through='OrderItem')
     total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    status =models.CharField(max_length=100, choices=ORDER_TYPE_CHOICES, default='InBucket')
+    status =models.CharField(max_length=100, choices=ORDER_TYPE_CHOICES, default='Pending')
     payment_status = models.CharField(max_length=100, choices=PAYMENT_STATUS, default='Unpaid')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

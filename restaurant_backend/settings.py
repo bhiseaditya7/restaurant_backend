@@ -11,9 +11,21 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+env_path = os.path.join(
+    os.path.dirname(BASE_DIR), 'ccenv3', 'CC.env'
+)
+
+# Load the .env file if the virtual environment is active
+if os.getenv('VIRTUAL_ENV') and 'ccenv3' in os.getenv('VIRTUAL_ENV'):
+    load_dotenv(env_path)
+else:
+    print("Warning: Could not load .env file. Make sure you have activated the correct virtual environment and that the .env file exists at the specified path.")
 
 
 # Quick-start development settings - unsuitable for production
@@ -25,8 +37,8 @@ SECRET_KEY = 'django-insecure-$0f-8!rivo*%7xhfw!^5@7hh5sawe558#xn)e4&73l^vi+7)0#
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
+# ALLOWED_HOSTS =  os.getenv('ALLOWED_HOSTS', '').split(',')
 ALLOWED_HOSTS = ['*']
-
 
 # Application definition
 
@@ -102,17 +114,30 @@ WSGI_APPLICATION = 'restaurant_backend.wsgi.application'
 #     }
 # }
 
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'billing_db',
-        'USER': 'postgres',
-        'PASSWORD': 'restpassword',
-        'HOST': 'database-1.cv4oso2444ha.ap-south-1.rds.amazonaws.com',
-        'PORT': '5432',
+        'NAME': os.getenv("DATABASE_NAME"),
+        'USER': os.getenv("DATABASE_USER"),
+        'PASSWORD': os.getenv("DATABASE_PASSWORD"),
+        'HOST': os.getenv("DATABASE_HOST"),
+        'PORT': os.getenv("DATABASE_PORT"),
     }
 }
+
+
+
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'billing_db',
+#         'USER': 'postgres',
+#         'PASSWORD': 'restpassword',
+#         'HOST': 'database-1.cv4oso2444ha.ap-south-1.rds.amazonaws.com',
+#         'PORT': '5432',
+#     }
+# }
 
 
 # Password validation
@@ -186,8 +211,8 @@ SWAGGER_SETTINGS = {
 CORS_ALLOWED_ORIGINS = [
     
     'https://billfit.in',
-    'http://localhost:5173/'
-    'http://localhost:3000',
+    'http://localhost:5173'
+    # 'http://localhost:3000',
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -218,8 +243,8 @@ REST_FRAMEWORK = {
 # JWT Configuration
 from datetime import timedelta
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=180),  # short lived access token
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),  # refresh token assignment in terms of days
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=14),  # short lived access token
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=20),  # refresh token assignment in terms of days
     'ROTATE_REFRESH_TOKEN': False,  # Refresh token rotation after use
     'BLACKLIST_AFTER_ROTATION': True,  # Blacklisting old tokens
     'ALGORITHM': 'HS256',
@@ -230,23 +255,23 @@ SIMPLE_JWT = {
 }
 
 import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 
-# CLOUDINARY_URL = os.getenv("CLOUDINARY_URL")
 CLOUDINARY_STORAGE = {
-    "CLOUD_NAME": "dzr2fxusg",
-    "API_KEY": "786211146358582",
-    "API_SECRET": "csWbaYRxLA_5mh9lHZEXjVaj-Ok",
+    "CLOUD_NAME": os.getenv("CLOUDINARY_CLOUD_NAME"),
+    "API_KEY": os.getenv("CLOUDINARY_API_KEY"),
+    "API_SECRET": os.getenv("CLOUDINARY_API_SECRET"),
 }
 
 DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
 
 cloudinary.config(
-    cloud_name="dzr2fxusg",
-    api_key="786211146358582",
-    api_secret="csWbaYRxLA_5mh9lHZEXjVaj-Ok",
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
 )
 
 
-
-RAZORPAY_KEY_ID = "rzp_test_SAOzr1f8iV7NLa"
-RAZORPAY_KEY_SECRET = "wme11n7FmW4JVl1XhMG8k4pt"
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")

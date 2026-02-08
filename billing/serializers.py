@@ -114,7 +114,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "payment_status",
             "created_at"
         ]
-        read_only_fields = ["id", "total_price", "status", "created_at"]
+        read_only_fields = ["id", "total_price", "status",  "payment_status","created_at"]
 
     def create(self, validated_data):
         items_data = validated_data.pop("orderitem_set", [])
@@ -149,9 +149,82 @@ class OrderStatusSerializer(serializers.ModelSerializer):
         model = Order
         fields = ["status", "payment_status"]
 
+    def validate(self, attrs):
+        request = self.context.get("request")
+        user = request.user
+
+        if not (user.is_staff or user.is_superuser):
+            raise serializers.ValidationError(
+                "Only admin can update order status or payment"
+            )
+
+        # Allowed transitions
+        allowed_statuses = ["Ongoing", "Preparing", "Completed", "Cancelled"]
+
+        if "status" in attrs:
+            if attrs["status"] not in allowed_statuses:
+                raise serializers.ValidationError(
+                    f"Invalid status: {attrs['status']}"
+                )
+
+        if "payment_status" in attrs:
+            if attrs["payment_status"] != "Paid":
+                raise serializers.ValidationError(
+                    "Admin can only mark payment as Paid"
+                )
+
+        return attrs
+
+
 from .models import Payment
 
 class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
         fields = "__all__"
+
+
+
+class AdminLoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+    print("pp",password)
+    def validate(self, attrs):
+        email = attrs["email"].strip().lower()
+        password = attrs["password"].strip()
+
+        print(f"Admin login attempt: {email}")
+        print(f"Password provided: {'Yes' if password else 'No'}")
+        print("password type:", password)
+        user = User.objects.filter(email=email).first()
+
+        print("USER FOUND:", user)
+        if user:
+            print("DB PASSWORD:", user.password)
+            print("CHECK PASSWORD:", user.check_password(password))
+            print("IS STAFF:", user.is_staff)
+            print("IS SUPERUSER:", user.is_superuser)
+
+        print("RAW PASSWORD REPR:", repr(password))
+        print("CHECK 1:", user.check_password(password))
+
+        pwd = password.strip()
+        print("CHECK STRIPPED:", user.check_password(pwd))
+
+
+        if not user or not user.check_password(password):
+            raise serializers.ValidationError("Invalid email or password")
+
+        if not (user.is_staff or user.is_superuser):
+            raise serializers.ValidationError("Not authorized as admin")
+
+        refresh = RefreshToken.for_user(user)
+
+        return {
+            "user_id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "is_admin": True,
+            "access_token": str(refresh.access_token),
+            "refresh_token": str(refresh),
+        }

@@ -31,6 +31,7 @@ from django.utils import timezone
 from .models import User, Menu , Order, OrderItem
 from .serializers import (
    
+     AdminLoginSerializer,
      MenuSerializer,
      OrderStatusSerializer,
      RegisterUserSerializer,
@@ -115,25 +116,53 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         # Staff/Admin can see all orders
         if user.is_staff or user.is_superuser:
-            return Order.objects.all().order_by("-created_at")
+            return Order.objects.all().order_by("-id")
 
         # Normal users see only their own orders
         return Order.objects.filter(user=user).order_by("-created_at")
 
+
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        request = self.request
+
+        payment_method = request.data.get("payment_method")
+
+        # 🔥 STATUS DECISION
+        if payment_method == "cash":
+            status = "Ongoing"
+        else:  # upi / card
+            status = "Pending"
+
+        serializer.save(
+            user=request.user,
+            status=status,
+            payment_status="Unpaid"
+        )
+
+
+
+    def update(self, request, *args, **kwargs):
+        raise PermissionDenied("Direct update not allowed")
+
+    def partial_update(self, request, *args, **kwargs):
+        raise PermissionDenied("Direct update not allowed")
+
 
     @action(detail=True, methods=["put"], url_path="change-status")
     def change_status(self, request, pk=None):
-
         user = request.user
 
-        # ✅ Staff-only access check
         if not (user.is_staff or user.is_superuser):
-            raise PermissionDenied("Only staff can change order status")
+            raise PermissionDenied("Only admin can change order status")
+
         order = self.get_object()
 
-        serializer = OrderStatusSerializer(order, data=request.data, partial=True)
+        serializer = OrderStatusSerializer(
+            order,
+            data=request.data,
+            partial=True,
+            context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
@@ -353,3 +382,14 @@ class VerifyRazorpayPayment(APIView):
                 {"status": "failed", "error": "Signature verification failed"},
                 status=400
             )
+
+
+
+class AdminLoginView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = AdminLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        return Response(serializer.validated_data, status=status.HTTP_200_OK)
