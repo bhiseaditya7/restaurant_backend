@@ -13,7 +13,7 @@ def create_default_user(sender, **kwargs):
     if not User.objects.filter(name="adityaa").exists():
         user = User(
             name="adityaa",
-            email="bhiseaditya7@gmail.com",
+            email="bhiseaditya874@gmail.com",
             phone_number="+918605423238",
             is_active=True,
             is_staff=True,
