@@ -99,22 +99,29 @@ class OrderItemSerializer(serializers.ModelSerializer):
         fields = ['menu', 'menu_name', 'quantity', 'price']
 
 
+class OrderUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["id", "name", "phone_number"]  
+
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(source="orderitem_set", many=True)
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
+    user_details = OrderUserSerializer(source="user", read_only=True)
 
     class Meta:
         model = Order
         fields = [
             "id",
             "user",
+            "user_details",
             "items",
             "total_price",
             "status",
             "payment_status",
             "created_at"
         ]
-        read_only_fields = ["id", "total_price", "status",  "payment_status","created_at"]
+        read_only_fields = ["id", "user_details","total_price", "status",  "payment_status","created_at"]
 
     def create(self, validated_data):
         items_data = validated_data.pop("orderitem_set", [])
