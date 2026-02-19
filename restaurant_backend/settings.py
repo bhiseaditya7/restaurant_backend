@@ -14,6 +14,8 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 
+# from restaurant_backend.middleware import TenantMiddleware
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -63,6 +65,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'restaurant_backend.middleware.TenantMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'axes.middleware.AxesMiddleware',
     'django.middleware.security.SecurityMiddleware',
@@ -114,6 +117,7 @@ WSGI_APPLICATION = 'restaurant_backend.wsgi.application'
 #     }
 # }
 
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -124,20 +128,6 @@ DATABASES = {
         'PORT': os.getenv("DATABASE_PORT"),
     }
 }
-
-
-
-
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': 'billing_db',
-#         'USER': 'postgres',
-#         'PASSWORD': 'restpassword',
-#         'HOST': 'database-1.cv4oso2444ha.ap-south-1.rds.amazonaws.com',
-#         'PORT': '5432',
-#     }
-# }
 
 
 # Password validation
@@ -273,8 +263,8 @@ cloudinary.config(
 )
 
 
-RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
-RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
+# RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
+# RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 
-# RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID_test")
-# RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET_test")
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID_test")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET_test")

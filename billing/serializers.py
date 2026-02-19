@@ -98,6 +98,15 @@ class OrderItemSerializer(serializers.ModelSerializer):
         model = OrderItem
         fields = ['menu', 'menu_name', 'quantity', 'price']
 
+    def validate_menu(self, menu):
+        request = self.context["request"]
+        restaurant = request.restaurant
+
+        if menu.restaurant_id != restaurant.id:
+            raise serializers.ValidationError("This menu does not belong to this restaurant")
+
+        return menu
+
 
 class OrderUserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -123,11 +132,50 @@ class OrderSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "user_details","total_price", "status",  "payment_status","created_at"]
 
+    # def create(self, validated_data):
+    #     items_data = validated_data.pop("orderitem_set", [])
+
+    #     # Create empty order first
+    #     order = Order.objects.create(total_price=0, **validated_data)
+
+    #     total = 0
+
+    #     for item in items_data:
+    #         menu = item["menu"]
+    #         quantity = item.get("quantity", 1)
+
+    #         price = menu.price  # ✅ price comes from DB only
+
+    #         OrderItem.objects.create(
+    #             order=order,
+    #             menu=menu,
+    #             quantity=quantity,
+    #             price=price
+    #         )
+
+    #         total += price * quantity
+
+    #     order.total_price = total
+    #     order.save()
+
+    #     return order
+
     def create(self, validated_data):
+        request = self.context["request"]
+        restaurant = request.restaurant
+
+        if not restaurant:
+            raise serializers.ValidationError("Restaurant not detected")
+
         items_data = validated_data.pop("orderitem_set", [])
 
-        # Create empty order first
-        order = Order.objects.create(total_price=0, **validated_data)
+        # attach restaurant automatically
+        order = Order.objects.create(
+            restaurant=restaurant,
+            user=request.user,
+            total_price=0,
+            **validated_data
+        )
 
         total = 0
 
@@ -135,7 +183,13 @@ class OrderSerializer(serializers.ModelSerializer):
             menu = item["menu"]
             quantity = item.get("quantity", 1)
 
-            price = menu.price  # ✅ price comes from DB only
+            # 🔒 SECURITY: menu must belong to same restaurant
+            if menu.restaurant_id != restaurant.id:
+                raise serializers.ValidationError(
+                    f"{menu.name} does not belong to this restaurant"
+                )
+
+            price = menu.price
 
             OrderItem.objects.create(
                 order=order,
@@ -150,6 +204,7 @@ class OrderSerializer(serializers.ModelSerializer):
         order.save()
 
         return order
+
     
 class OrderStatusSerializer(serializers.ModelSerializer):
     class Meta:
@@ -159,6 +214,11 @@ class OrderStatusSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         request = self.context.get("request")
         user = request.user
+        order = self.instance
+
+        
+        if order.restaurant_id != request.restaurant.id:
+            raise serializers.ValidationError("Cannot modify another restaurant order")
 
         if not (user.is_staff or user.is_superuser):
             raise serializers.ValidationError(
@@ -186,9 +246,13 @@ class OrderStatusSerializer(serializers.ModelSerializer):
 from .models import Payment
 
 class PaymentSerializer(serializers.ModelSerializer):
+    # class Meta:
+    #     model = Payment
+    #     fields = "__all__"
     class Meta:
         model = Payment
-        fields = "__all__"
+        fields = ["id", "order", "amount", "payment_method", "status", "created_at"]
+        read_only_fields = ["status"]
 
 
 

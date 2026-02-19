@@ -90,9 +90,16 @@ class SignInView(APIView):
 
 
 class MenuViewSet(viewsets.ModelViewSet):
-    queryset = Menu.objects.all()
+    # queryset = Menu.objects.all()
     permission_classes = [IsAuthenticated]
     serializer_class = MenuSerializer
+
+    def get_queryset(self):
+        restaurant = self.request.restaurant
+        if not restaurant:
+            return Menu.objects.none()
+
+        return Menu.objects.filter(restaurant=restaurant)
 
     def get_permissions(self):
         # Allow anyone to view menu
@@ -107,19 +114,37 @@ class OrderViewSet(viewsets.ModelViewSet):
     serializer_class = OrderSerializer
     permission_classes = [permissions.AllowAny]
 
+    # def get_queryset(self):
+    #     user = self.request.user
+
+    #     # Prevent crash for Swagger / unauthenticated requests
+    #     if not user.is_authenticated:
+    #         return Order.objects.none()
+
+    #     # Staff/Admin can see all orders
+    #     if user.is_staff or user.is_superuser:
+    #         return Order.objects.all().order_by("-id")
+
+    #     # Normal users see only their own orders
+    #     return Order.objects.filter(user=user).order_by("-created_at")
+
     def get_queryset(self):
+        restaurant = self.request.restaurant
         user = self.request.user
 
-        # Prevent crash for Swagger / unauthenticated requests
-        if not user.is_authenticated:
+        if not restaurant:
             return Order.objects.none()
 
-        # Staff/Admin can see all orders
-        if user.is_staff or user.is_superuser:
-            return Order.objects.all().order_by("-id")
+        qs = Order.objects.filter(restaurant=restaurant)
 
-        # Normal users see only their own orders
-        return Order.objects.filter(user=user).order_by("-created_at")
+        if not user.is_authenticated:
+            return qs.none()
+
+        if user.is_staff or user.is_superuser:
+            return qs.order_by("-id")
+
+        return qs.filter(user=user).order_by("-created_at")
+
 
 
     def perform_create(self, serializer):
@@ -135,6 +160,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         serializer.save(
             user=request.user,
+            restaurant=request.restaurant,
             status=status,
             payment_status="Unpaid"
         )
@@ -180,7 +206,7 @@ class CreatePaymentView(APIView):
         payment_method = request.data.get("payment_method")
 
         try:
-            order = Order.objects.get(id=order_id, user=request.user)
+            order = Order.objects.get(id=order_id, user=request.restaurant)
         except Order.DoesNotExist:
             return Response({"error": "Order not found"}, status=404)
 
@@ -213,7 +239,7 @@ class VerifyPaymentView(APIView):
         status_value = request.data.get("status")  # success / failed
 
         try:
-            payment = Payment.objects.get(id=payment_id, user=request.user)
+            payment = Payment.objects.get(id=payment_id, user=request.user, order__restaurant = request.restaurant)
         except Payment.DoesNotExist:
             return Response({"error": "Payment not found"}, status=404)
 
@@ -252,7 +278,7 @@ class RazorpayCreatePayment(APIView):
     def post(self, request):
         order_id = request.data.get("order_id")
 
-        order = Order.objects.get(id=order_id, user=request.user)
+        order = Order.objects.get(id=order_id, user=request.user, restaurant = request.restaurant)
         amount = int(order.total_price * 100)  # paise
 
         client = razorpay.Client(
@@ -349,7 +375,8 @@ class VerifyRazorpayPayment(APIView):
             # 2️⃣ Fetch payment safely
             payment = Payment.objects.select_related("order").get(
                 id=data["payment_id"],
-                user=request.user
+                user=request.user,
+                order__restaurant = request.restaurant
             )
 
             if payment.status == "success":
