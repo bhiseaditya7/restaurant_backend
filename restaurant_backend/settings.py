@@ -131,6 +131,14 @@ DATABASES = {
     }
 }
 
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "tenant-cache",
+    }
+}
+
 #at the time of upgradation
 # ASGI_APPLICATION = "restaurant_backend.asgi.application"
 
@@ -300,4 +308,5 @@ RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 
 # RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID_test")
 # RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET_test")
+
 

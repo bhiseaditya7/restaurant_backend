@@ -135,6 +135,23 @@ class OrderViewSet(viewsets.ModelViewSet):
     #     # Normal users see only their own orders
     #     return Order.objects.filter(user=user).order_by("-created_at")
 
+    # def get_queryset(self):
+    #     restaurant = self.request.restaurant
+    #     user = self.request.user
+
+    #     if not restaurant:
+    #         return Order.objects.none()
+
+    #     qs = Order.objects.filter(restaurant=restaurant).exclude(status ='Pending')
+
+    #     if not user.is_authenticated:
+    #         return qs.none()
+
+    #     if user.is_staff or user.is_superuser:
+    #         return qs.order_by("-id")
+
+    #     return qs.filter(user=user).exclude(status="Pending").order_by("-created_at")
+
     def get_queryset(self):
         restaurant = self.request.restaurant
         user = self.request.user
@@ -142,7 +159,11 @@ class OrderViewSet(viewsets.ModelViewSet):
         if not restaurant:
             return Order.objects.none()
 
-        qs = Order.objects.filter(restaurant=restaurant).exclude(status ='Pending')
+        qs = (
+            Order.objects.filter(restaurant=restaurant)
+            .select_related("user", "restaurant")
+            .prefetch_related("items__menu")
+        )
 
         if not user.is_authenticated:
             return qs.none()
@@ -151,6 +172,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             return qs.order_by("-id")
 
         return qs.filter(user=user).exclude(status="Pending").order_by("-created_at")
+
 
 
 

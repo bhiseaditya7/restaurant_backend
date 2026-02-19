@@ -136,8 +136,61 @@
 #             request.restaurant = None
 
 
+# from django.utils.deprecation import MiddlewareMixin
+# from billing.models import Restaurant
+
+
+# class TenantMiddleware(MiddlewareMixin):
+
+#     def process_request(self, request):
+
+#         request.restaurant = None
+#         domain = None
+
+#         # 1️⃣ MOST RELIABLE (browser navigation)
+#         referer = request.headers.get("Referer")
+#         if referer:
+#             domain = referer.split("://")[-1].split("/")[0]
+
+#         # 2️⃣ API calls (fetch/axios)
+#         if not domain:
+#             origin = request.headers.get("Origin")
+#             if origin:
+#                 domain = origin.split("://")[-1].split("/")[0]
+
+#         # 3️⃣ Direct calls / Postman
+#         if not domain:
+#             domain = request.get_host()
+
+#         if not domain:
+#             return
+
+#         # remove port
+#         domain = domain.split(":")[0]
+
+#         # ignore platform domains
+#         if (
+#             domain == "billfit.in"
+#             or domain == "www.billfit.in"
+#             or domain.startswith("api.")
+#         ):
+#             return
+
+#         # extract subdomain safely
+#         subdomain = domain.split(".")[0]
+
+#         try:
+#             request.restaurant = Restaurant.objects.get(
+#                 subdomain=subdomain,
+#                 is_active=True
+#             )
+#         except Restaurant.DoesNotExist:
+#             request.restaurant = None
+
+
 from django.utils.deprecation import MiddlewareMixin
 from billing.models import Restaurant
+from django.core.cache import cache
 
 
 class TenantMiddleware(MiddlewareMixin):
@@ -179,10 +232,18 @@ class TenantMiddleware(MiddlewareMixin):
         # extract subdomain safely
         subdomain = domain.split(".")[0]
 
-        try:
-            request.restaurant = Restaurant.objects.get(
-                subdomain=subdomain,
-                is_active=True
-            )
-        except Restaurant.DoesNotExist:
-            request.restaurant = None
+        # 🚀 CACHE OPTIMIZATION
+        cache_key = f"tenant_restaurant_{subdomain}"
+        restaurant = cache.get(cache_key)
+
+        if restaurant is None:
+            try:
+                restaurant = Restaurant.objects.get(
+                    subdomain=subdomain,
+                    is_active=True
+                )
+                cache.set(cache_key, restaurant, 300)
+            except Restaurant.DoesNotExist:
+                restaurant = None
+
+        request.restaurant = restaurant
