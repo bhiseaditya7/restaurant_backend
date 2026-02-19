@@ -109,10 +109,10 @@ class MenuViewSet(viewsets.ModelViewSet):
         # Only superuser/admin can modify menu
         return [IsAdminUser()]
 
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
+# from asgiref.sync import async_to_sync
+# from channels.layers import get_channel_layer
 
-channel_layer = get_channel_layer()
+# channel_layer = get_channel_layer()
 
 
 
@@ -172,16 +172,16 @@ class OrderViewSet(viewsets.ModelViewSet):
             payment_status="Unpaid"
         )
 
-        async_to_sync(channel_layer.group_send)(
-            f"orders_{request.restaurant.subdomain}",
-            {
-                "type": "new_order",
-                "data": {
-                    "event": "NEW_ORDER",
-                    "order_id": serializer.instance.id,
-                }
-            }
-        )
+        # async_to_sync(channel_layer.group_send)(
+        #     f"orders_{request.restaurant.subdomain}",
+        #     {
+        #         "type": "new_order",
+        #         "data": {
+        #             "event": "NEW_ORDER",
+        #             "order_id": serializer.instance.id,
+        #         }
+        #     }
+        # )
 
 
 

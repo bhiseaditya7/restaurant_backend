@@ -1,6 +1,6 @@
-from django.urls import re_path
-from .consumers import OrderConsumer
+# from django.urls import re_path
+# from .consumers import OrderConsumer
 
-websocket_urlpatterns = [
-    re_path(r"ws/orders/(?P<restaurant>[\w-]+)/$", OrderConsumer.as_asgi()),
-]
+# websocket_urlpatterns = [
+#     re_path(r"ws/orders/(?P<restaurant>[\w-]+)/$", OrderConsumer.as_asgi()),
+# ]
