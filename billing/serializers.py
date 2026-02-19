@@ -161,34 +161,16 @@ class OrderSerializer(serializers.ModelSerializer):
     #     return order
 
     def create(self, validated_data):
-        request = self.context["request"]
-        restaurant = request.restaurant
-
-        if not restaurant:
-            raise serializers.ValidationError("Restaurant not detected")
-
         items_data = validated_data.pop("orderitem_set", [])
 
-        # attach restaurant automatically
-        order = Order.objects.create(
-            restaurant=restaurant,
-            user=request.user,
-            total_price=0,
-            **validated_data
-        )
+        # user & restaurant will come from perform_create()
+        order = Order.objects.create(**validated_data)
 
         total = 0
 
         for item in items_data:
             menu = item["menu"]
-            quantity = item.get("quantity", 1)
-
-            # 🔒 SECURITY: menu must belong to same restaurant
-            if menu.restaurant_id != restaurant.id:
-                raise serializers.ValidationError(
-                    f"{menu.name} does not belong to this restaurant"
-                )
-
+            quantity = item["quantity"]
             price = menu.price
 
             OrderItem.objects.create(
@@ -204,6 +186,7 @@ class OrderSerializer(serializers.ModelSerializer):
         order.save()
 
         return order
+
 
     
 class OrderStatusSerializer(serializers.ModelSerializer):

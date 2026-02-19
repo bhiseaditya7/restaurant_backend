@@ -109,6 +109,13 @@ class MenuViewSet(viewsets.ModelViewSet):
         # Only superuser/admin can modify menu
         return [IsAdminUser()]
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+
+channel_layer = get_channel_layer()
+
+
+
 
 class OrderViewSet(viewsets.ModelViewSet):
     serializer_class = OrderSerializer
@@ -135,7 +142,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         if not restaurant:
             return Order.objects.none()
 
-        qs = Order.objects.filter(restaurant=restaurant)
+        qs = Order.objects.filter(restaurant=restaurant).exclude(status ='Pending')
 
         if not user.is_authenticated:
             return qs.none()
@@ -143,7 +150,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         if user.is_staff or user.is_superuser:
             return qs.order_by("-id")
 
-        return qs.filter(user=user).order_by("-created_at")
+        return qs.filter(user=user).exclude(status="Pending").order_by("-created_at")
 
 
 
@@ -163,6 +170,17 @@ class OrderViewSet(viewsets.ModelViewSet):
             restaurant=request.restaurant,
             status=status,
             payment_status="Unpaid"
+        )
+
+        async_to_sync(channel_layer.group_send)(
+            f"orders_{request.restaurant.subdomain}",
+            {
+                "type": "new_order",
+                "data": {
+                    "event": "NEW_ORDER",
+                    "order_id": serializer.instance.id,
+                }
+            }
         )
 
 
@@ -264,36 +282,198 @@ class VerifyPaymentView(APIView):
 
 # users/views.py
 # users/views.py
+# import razorpay
+# from django.conf import settings
+
+# client = razorpay.Client(
+#     auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
+# )
+
+
+# class RazorpayCreatePayment(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def post(self, request):
+#         order_id = request.data.get("order_id")
+
+#         order = Order.objects.get(id=order_id, user=request.user, restaurant = request.restaurant)
+#         amount = int(order.total_price * 100)  # paise
+
+#         client = razorpay.Client(
+#             auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
+#         )
+
+#         razorpay_order = client.order.create({
+#             "amount": amount,
+#             "currency": "INR",
+#             "payment_capture": 1
+#         })
+
+#         payment = Payment.objects.create(
+#             user=request.user,
+#             order=order,
+#             amount=order.total_price,
+#             payment_method="razorpay",
+#             status="pending"
+#         )
+
+#         return Response({
+#             "razorpay_key": settings.RAZORPAY_KEY_ID,
+#             "razorpay_order_id": razorpay_order["id"],
+#             "payment_id": payment.id,
+#             "amount": amount
+#         })
+    
+
+# from rest_framework.views import APIView
+# from rest_framework.permissions import IsAuthenticated
+# from rest_framework.response import Response
+# from django.conf import settings
+# import razorpay
+
+# from .models import Order, Payment
+
+# client = razorpay.Client(
+#     auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
+# )
+
+
+# class VerifyRazorpayPayment(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def post(self, request):
+#         data = request.data
+
+#         required_fields = [
+#             "razorpay_order_id",
+#             "razorpay_payment_id",
+#             "razorpay_signature",
+#             "payment_id",
+#         ]
+
+#         for field in required_fields:
+#             if field not in data:
+#                 return Response(
+#                     {"error": f"{field} is required"},
+#                     status=400
+#                 )
+
+#         try:
+#             # 1️⃣ Verify Razorpay signature
+#             client.utility.verify_payment_signature({
+#                 "razorpay_order_id": data["razorpay_order_id"],
+#                 "razorpay_payment_id": data["razorpay_payment_id"],
+#                 "razorpay_signature": data["razorpay_signature"],
+#             })
+
+#             # 2️⃣ Fetch payment safely
+#             payment = Payment.objects.select_related("order").get(
+#                 id=data["payment_id"],
+#                 user=request.user,
+#                 order__restaurant = request.restaurant
+#             )
+
+#             if payment.status == "success":
+#                 return Response({"status": "already_paid"})
+
+#             # 3️⃣ Mark payment success
+#             payment.status = "success"
+#             payment.transaction_id = data["razorpay_payment_id"]
+#             payment.save()
+
+#             # 4️⃣ Update order
+#             order = payment.order
+#             order.payment_status = "Paid"
+#             order.status = "Ongoing"
+#             order.save()
+
+#             return Response({
+#                 "status": "success",
+#                 "order_id": order.id
+#             })
+
+#         except Payment.DoesNotExist:
+#             return Response(
+#                 {"error": "Invalid payment"},
+#                 status=404
+#             )
+
+#         except razorpay.errors.SignatureVerificationError:
+#             return Response(
+#                 {"status": "failed", "error": "Signature verification failed"},
+#                 status=400
+#             )
+
+
+
+class AdminLoginView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = AdminLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        return Response(serializer.validated_data, status=status.HTTP_200_OK)
+
+
 import razorpay
 from django.conf import settings
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
 
-client = razorpay.Client(
+from .models import Order, Payment
+
+
+# Single reusable client
+razorpay_client = razorpay.Client(
     auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
 )
 
 
+# ---------------------------
+# CREATE PAYMENT ORDER
+# ---------------------------
 class RazorpayCreatePayment(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+
+        restaurant = request.restaurant
+        if not restaurant:
+            return Response({"error": "Restaurant not detected"}, status=400)
+
         order_id = request.data.get("order_id")
+        if not order_id:
+            return Response({"error": "order_id required"}, status=400)
 
-        order = Order.objects.get(id=order_id, user=request.user, restaurant = request.restaurant)
-        amount = int(order.total_price * 100)  # paise
-
-        client = razorpay.Client(
-            auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
+        # Only allow own order of this restaurant
+        order = get_object_or_404(
+            Order,
+            id=order_id,
+            user=request.user,
+            restaurant=restaurant
         )
 
-        razorpay_order = client.order.create({
+        if order.payment_status == "Paid":
+            return Response({"error": "Order already paid"}, status=400)
+
+        amount = int(order.total_price * 100)  # paise
+
+        # Create Razorpay order
+        razorpay_order = razorpay_client.order.create({
             "amount": amount,
             "currency": "INR",
             "payment_capture": 1
         })
 
+        # Create DB payment record (IMPORTANT: attach restaurant)
         payment = Payment.objects.create(
             user=request.user,
             order=order,
+            restaurant=restaurant,
             amount=order.total_price,
             payment_method="razorpay",
             status="pending"
@@ -305,49 +485,17 @@ class RazorpayCreatePayment(APIView):
             "payment_id": payment.id,
             "amount": amount
         })
-    
-
-
-# class VerifyRazorpayPayment(APIView):
-#     permission_classes = [IsAuthenticated]
-
-#     def post(self, request):
-#         data = request.data
-
-#         try:
-#             client.utility.verify_payment_signature({
-#                 "razorpay_order_id": data["razorpay_order_id"],
-#                 "razorpay_payment_id": data["razorpay_payment_id"],
-#                 "razorpay_signature": data["razorpay_signature"],
-#             })
-
-#             order = Order.objects.get(id=data["order_id"])
-#             order.payment_status = "Paid"
-#             order.status = "Ongoing"
-#             order.save()
-
-#             return Response({"status": "success"})
-
-#         except razorpay.errors.SignatureVerificationError:
-#             return Response({"status": "failed"}, status=400)
-
-from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from django.conf import settings
-import razorpay
-
-from .models import Order, Payment
-
-client = razorpay.Client(
-    auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
-)
 
 
 class VerifyRazorpayPayment(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+
+        restaurant = request.restaurant
+        if not restaurant:
+            return Response({"error": "Restaurant not detected"}, status=400)
+
         data = request.data
 
         required_fields = [
@@ -359,24 +507,21 @@ class VerifyRazorpayPayment(APIView):
 
         for field in required_fields:
             if field not in data:
-                return Response(
-                    {"error": f"{field} is required"},
-                    status=400
-                )
+                return Response({"error": f"{field} is required"}, status=400)
 
         try:
             # 1️⃣ Verify Razorpay signature
-            client.utility.verify_payment_signature({
+            razorpay_client.utility.verify_payment_signature({
                 "razorpay_order_id": data["razorpay_order_id"],
                 "razorpay_payment_id": data["razorpay_payment_id"],
                 "razorpay_signature": data["razorpay_signature"],
             })
 
-            # 2️⃣ Fetch payment safely
+            # 2️⃣ Fetch payment securely (tenant safe)
             payment = Payment.objects.select_related("order").get(
                 id=data["payment_id"],
                 user=request.user,
-                order__restaurant = request.restaurant
+                order__restaurant=restaurant
             )
 
             if payment.status == "success":
@@ -399,24 +544,10 @@ class VerifyRazorpayPayment(APIView):
             })
 
         except Payment.DoesNotExist:
-            return Response(
-                {"error": "Invalid payment"},
-                status=404
-            )
+            return Response({"error": "Invalid payment"}, status=404)
 
         except razorpay.errors.SignatureVerificationError:
             return Response(
                 {"status": "failed", "error": "Signature verification failed"},
                 status=400
             )
-
-
-
-class AdminLoginView(APIView):
-    permission_classes = [permissions.AllowAny]
-
-    def post(self, request):
-        serializer = AdminLoginSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        return Response(serializer.validated_data, status=status.HTTP_200_OK)

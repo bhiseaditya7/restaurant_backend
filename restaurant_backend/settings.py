@@ -131,6 +131,14 @@ DATABASES = {
     }
 }
 
+#at the time of upgradation
+# ASGI_APPLICATION = "restaurant_backend.asgi.application"
+
+# CHANNEL_LAYERS = {
+#     "default": {
+#         "BACKEND": "channels.layers.InMemoryChannelLayer"
+#     }
+# }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -224,10 +232,12 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 CORS_ALLOWED_ORIGINS = [
     "https://billfit.in",
     "http://localhost:5173",
+    "http://saishwar.127.0.0.1.nip.io:5173",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
     "https://*.billfit.in",
+    "http://*.127.0.0.1.nip.io:5173",
 ]
 
 REST_FRAMEWORK = {
@@ -285,8 +295,9 @@ cloudinary.config(
 )
 
 
-# RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
-# RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 
-RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID_test")
-RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET_test")
+# RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID_test")
+# RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET_test")
+
