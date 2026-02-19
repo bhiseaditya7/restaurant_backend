@@ -159,11 +159,13 @@ class OrderViewSet(viewsets.ModelViewSet):
         if not restaurant:
             return Order.objects.none()
 
-        qs = (
-            Order.objects.filter(restaurant=restaurant)
-            .select_related("user", "restaurant")
-            .prefetch_related("items__menu")
-        )
+        # qs = (
+        #     Order.objects.filter(restaurant=restaurant)
+        #     .select_related("user", "restaurant")
+        #     .prefetch_related("items__menu")
+        # )
+        qs = Order.objects.filter(restaurant=restaurant).select_related("user").prefetch_related("orderitem_set__menu")
+
 
         if not user.is_authenticated:
             return qs.none()
